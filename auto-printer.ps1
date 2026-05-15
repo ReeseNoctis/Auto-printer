@@ -10,9 +10,9 @@ $watchFolder = "Z:\Desktop\Print_Queue"
 $doneFolder = "Z:\Desktop\Printed_Done"
 
 # --- SumatraPDF paths ---
-# Replace "524370910258" with your own student ID (the Windows username in your Omnissa VM)
+# Replace "<your jaccount ID>" with your own student ID (the Windows username in your Omnissa VM)
 $sumatraPaths = @(
-    "C:\Users\524370910258\AppData\Local\SumatraPDF\SumatraPDF.exe",  # <-- Replace 524370910258 with your student ID
+    "C:\Users\<your jaccount ID>\AppData\Local\SumatraPDF\SumatraPDF.exe",  # <-- Replace <your jaccount ID> with your student ID
     "C:\Program Files\SumatraPDF\SumatraPDF.exe",
     "C:\Program Files (x86)\SumatraPDF\SumatraPDF.exe"
 )
