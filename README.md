@@ -23,14 +23,7 @@ Install it in your Omnissa Windows VM. The script will automatically detect it.
 
 > **Why SumatraPDF?** Adobe Acrobat will show popup windows during printing, which can be annoying. SumatraPDF's `-print-to-default` flag enables completely silent printing.
 
-### 2. Set Your School Printer as Default
-
-In your Windows VM:
-1. Open **Settings** → **Devices** → **Printers & scanners**
-2. Find your school printer (e.g., `\\printersrv2\JI Printer`)
-3. Click **Manage** → **Set as default**
-
-### 3. Enable Omnissa Shared Folders
+### 2. Enable Omnissa Shared Folders
 
 Make sure your Mac folders are mapped to the Windows VM:
 - Your Mac Desktop should be accessible as `Z:\Desktop` in the VM
@@ -50,15 +43,15 @@ On your **Mac Desktop**, create two folders:
 Open `auto-printer.ps1` and find line 15:
 
 ```powershell
-"C:\Users\524370910258\AppData\Local\SumatraPDF\SumatraPDF.exe",  # <-- Replace 524370910258 with your student ID
+"C:\Users\<your jaccount ID>\AppData\Local\SumatraPDF\SumatraPDF.exe",  # <-- Replace <your jaccount ID> with your student ID
 ```
 
-Replace `524370910258` with your own student ID (your Windows username in the Omnissa VM).
+Replace `<your jaccount ID>` with your own student ID (your Windows username in the Omnissa VM).
 
 ### Step 3: Place the Script
 
 Put `auto-printer.ps1` in a location accessible from the VM, e.g.:
-- `Z:\Documents\trae_projects\Auto-printer\auto-printer.ps1`
+- `Z:\Documents\myProjects\Auto-printer\auto-printer.ps1`
 
 ## Usage
 
@@ -76,8 +69,11 @@ Supported formats:
 In your Omnissa Windows VM, open **PowerShell** and run:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File "Z:\Documents\trae_projects\Auto-printer\auto-printer.ps1"
+powershell -ExecutionPolicy Bypass -File "<file path>"
 ```
+
+Replace `<file path>` with the full path to `auto-printer.ps1`, e.g.:
+- `Z:\Documents\myProjects\Auto-printer\auto-printer.ps1`
 
 ### 3. Wait for Completion
 
@@ -94,7 +90,7 @@ Example output:
   Auto Printer - Z:\Desktop\Print_Queue
 ============================================
 [INFO] Default printer: \\printersrv2\JI Printer
-[INFO] Found SumatraPDF: C:\Users\524370910258\AppData\Local\SumatraPDF\SumatraPDF.exe
+[INFO] Found SumatraPDF: C:\Users\<your jaccount ID>\AppData\Local\SumatraPDF\SumatraPDF.exe
 ----------------------------------------
 [1/8] lecture1.pdf
 [PRINT] PDF (SumatraPDF silent): Z:\Desktop\Print_Queue\lecture1.pdf
