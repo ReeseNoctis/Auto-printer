@@ -10,9 +10,9 @@ $watchFolder = "Z:\Desktop\Print_Queue"
 $doneFolder = "Z:\Desktop\Printed_Done"
 
 # --- SumatraPDF paths ---
-# Replace "<your jaccount ID>" with your own student ID (the Windows username in your Omnissa VM)
+# Replace "524370910258" with your own student ID (the Windows username in your Omnissa VM)
 $sumatraPaths = @(
-    "C:\Users\<your jaccount ID>\AppData\Local\SumatraPDF\SumatraPDF.exe",  # <-- Replace <your jaccount ID> with your student ID
+    "C:\Users\524370910258\AppData\Local\SumatraPDF\SumatraPDF.exe",  # <-- Replace 524370910258 with your student ID
     "C:\Program Files\SumatraPDF\SumatraPDF.exe",
     "C:\Program Files (x86)\SumatraPDF\SumatraPDF.exe"
 )
@@ -73,6 +73,53 @@ if ($sumatraPath) {
     Write-Host "[WARN] No PDF reader found! Please install SumatraPDF or Adobe Acrobat Reader."
 }
 
+# --- Progress bar function ---
+function Show-ProgressBar {
+    param(
+        [int]$Current,
+        [int]$Total,
+        [string]$Label = ""
+    )
+
+    $width = 30
+    $percent = [math]::Floor(($Current / $Total) * 100)
+    $filled = [math]::Floor(($Current / $Total) * $width)
+    $empty = $width - $filled
+
+    $bar = "[" + ("#" * $filled) + ("-" * $empty) + "]"
+    $status = "$bar $percent% ($Current/$Total)"
+
+    if ($Label) {
+        $status = "$Label $status"
+    }
+
+    Write-Host $status
+}
+
+# --- Spinner function ---
+# Shows a spinning animation while waiting for a process to complete
+function Wait-WithSpinner {
+    param(
+        [System.Diagnostics.Process]$Process,
+        [string]$Message = "Printing",
+        [int]$TimeoutSeconds = 120
+    )
+
+    $spinner = @("|", "/", "-", "\")
+    $i = 0
+    $elapsed = 0
+
+    while (!$Process.HasExited -and $elapsed -lt $TimeoutSeconds) {
+        $frame = $spinner[$i % 4]
+        Write-Host -NoNewline "`r  $Message... $frame   "
+        Start-Sleep -Milliseconds 500
+        $elapsed += 0.5
+        $i++
+    }
+
+    Write-Host -NoNewline "`r  $Message... Done!    `n"
+}
+
 # --- Print function ---
 # Supports: PDF, Word (.doc/.docx), Excel (.xls/.xlsx)
 function Print-File {
@@ -85,51 +132,63 @@ function Print-File {
     if ($ext -eq ".pdf") {
         # PDF: SumatraPDF (completely silent) > Adobe (/t flag) > Windows Print verb
         if ($sumatraPath) {
-            Write-Host "[PRINT] PDF (SumatraPDF silent): $FilePath"
-            Start-Process -FilePath $sumatraPath -ArgumentList "-print-to-default `"$FilePath`"" -Wait -WindowStyle Hidden
+            Write-Host "  [1/3] Sending to SumatraPDF..."
+            $proc = Start-Process -FilePath $sumatraPath -ArgumentList "-print-to-default `"$FilePath`"" -PassThru -WindowStyle Hidden
+            Write-Host "  [2/3] Spooling to printer..."
+            Wait-WithSpinner -Process $proc -Message "  [2/3] Spooling to printer" -TimeoutSeconds 120
+            Write-Host "  [3/3] Print job sent!"
         }
         elseif ($adobePath) {
-            Write-Host "[PRINT] PDF (Adobe Acrobat): $FilePath"
-            # Adobe /t flag: print to specified printer and close
+            Write-Host "  [1/3] Sending to Adobe Acrobat..."
             $proc = Start-Process -FilePath $adobePath -ArgumentList "/t `"$FilePath`" `"$defaultPrinter`"" -PassThru -WindowStyle Hidden
-            Start-Sleep -Seconds 10
+            Write-Host "  [2/3] Spooling to printer..."
+            Wait-WithSpinner -Process $proc -Message "  [2/3] Spooling to printer" -TimeoutSeconds 120
             if ($proc -and !$proc.HasExited) {
                 Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
             }
+            Write-Host "  [3/3] Print job sent!"
         }
         else {
-            # Last resort: use Windows shell Print verb (requires a PDF reader to be associated with .pdf)
-            Write-Host "[PRINT] PDF (Windows native Print verb): $FilePath"
+            Write-Host "  [1/3] Sending via Windows Print verb..."
             try {
                 $proc = Start-Process -FilePath $FilePath -Verb Print -PassThru -ErrorAction Stop
-                if ($proc) {
-                    Start-Sleep -Seconds 8
-                    if (!$proc.HasExited) {
-                        Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
-                    }
+                Write-Host "  [2/3] Spooling to printer..."
+                Wait-WithSpinner -Process $proc -Message "  [2/3] Spooling to printer" -TimeoutSeconds 60
+                if ($proc -and !$proc.HasExited) {
+                    Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
                 }
+                Write-Host "  [3/3] Print job sent!"
             }
             catch {
-                Write-Host "[ERROR] No PDF reader available. Please install SumatraPDF or Adobe Acrobat Reader."
+                Write-Host "  [ERROR] No PDF reader available. Please install SumatraPDF or Adobe Acrobat Reader."
                 return $false
             }
         }
     }
     # Word documents: use Word COM object for silent printing (requires Microsoft Office)
     elseif ($ext -in @(".doc", ".docx")) {
-        Write-Host "[PRINT] Word document: $FilePath"
+        Write-Host "  [1/3] Opening Word..."
         $word = $null
         try {
             $word = New-Object -ComObject Word.Application
             $word.Visible = $false
+            Write-Host "  [2/3] Spooling to printer..."
             $doc = $word.Documents.Open($FilePath)
             $doc.PrintOut()
-            Start-Sleep -Seconds 5
+            $spinner = @("|", "/", "-", "\")
+            $i = 0
+            for ($s = 0; $s -lt 10; $s++) {
+                Write-Host -NoNewline "`r  [2/3] Spooling to printer... $($spinner[$i % 4])   "
+                Start-Sleep -Milliseconds 500
+                $i++
+            }
+            Write-Host -NoNewline "`r  [2/3] Spooling to printer... Done!    `n"
             $doc.Close($false)
             $word.Quit()
+            Write-Host "  [3/3] Print job sent!"
         }
         catch {
-            Write-Host "[ERROR] Failed to print Word file: $_"
+            Write-Host "  [ERROR] Failed to print Word file: $_"
             if ($word) {
                 try { $word.Quit() } catch {}
             }
@@ -138,21 +197,30 @@ function Print-File {
     }
     # Excel documents: use Excel COM object for silent printing (requires Microsoft Office)
     elseif ($ext -in @(".xls", ".xlsx")) {
-        Write-Host "[PRINT] Excel document: $FilePath"
+        Write-Host "  [1/3] Opening Excel..."
         $excel = $null
         try {
             $excel = New-Object -ComObject Excel.Application
             $excel.Visible = $false
             $excel.DisplayAlerts = $false
+            Write-Host "  [2/3] Spooling to printer..."
             $wb = $excel.Workbooks.Open($FilePath)
             $ws = $wb.Worksheets.Item(1)
             $ws.PrintOut()
-            Start-Sleep -Seconds 5
+            $spinner = @("|", "/", "-", "\")
+            $i = 0
+            for ($s = 0; $s -lt 10; $s++) {
+                Write-Host -NoNewline "`r  [2/3] Spooling to printer... $($spinner[$i % 4])   "
+                Start-Sleep -Milliseconds 500
+                $i++
+            }
+            Write-Host -NoNewline "`r  [2/3] Spooling to printer... Done!    `n"
             $wb.Close($false)
             $excel.Quit()
+            Write-Host "  [3/3] Print job sent!"
         }
         catch {
-            Write-Host "[ERROR] Failed to print Excel file: $_"
+            Write-Host "  [ERROR] Failed to print Excel file: $_"
             if ($excel) {
                 try { $excel.Quit() } catch {}
             }
@@ -160,7 +228,7 @@ function Print-File {
         }
     }
     else {
-        Write-Host "[SKIP] Unsupported file type ($ext): $FilePath"
+        Write-Host "  [SKIP] Unsupported file type ($ext)"
         return $false
     }
 
@@ -197,7 +265,8 @@ try {
         $fileName = $file.Name
 
         Write-Host "----------------------------------------"
-        Write-Host "[$current/$totalCount] $fileName"
+        Show-ProgressBar -Current $current -Total $totalCount -Label "Overall:"
+        Write-Host "  File: $fileName"
 
         try {
             $success = Print-File -FilePath $filePath
@@ -217,14 +286,14 @@ try {
                 }
 
                 Move-Item -Path $filePath -Destination $destPath -Force
-                Write-Host "[DONE] Moved to: $destPath"
+                Write-Host "  -> Moved to done folder"
             }
             else {
                 $failCount++
             }
         }
         catch {
-            Write-Host "[ERROR] Failed to process ${fileName}: $_"
+            Write-Host "  [ERROR] Failed to process ${fileName}: $_"
             $failCount++
         }
     }
@@ -232,7 +301,8 @@ try {
     # All files printed successfully
     Write-Host "============================================"
     Write-Host "  ALL DONE!"
-    Write-Host "  Total: $totalCount | Success: $successCount | Failed: $failCount"
+    Show-ProgressBar -Current $successCount -Total $totalCount -Label "Result:"
+    Write-Host "  Success: $successCount | Failed: $failCount"
     Write-Host "============================================"
 
     # Clean up the done folder after successful completion

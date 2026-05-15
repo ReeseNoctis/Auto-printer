@@ -7,9 +7,11 @@ A PowerShell script for batch printing PDF, Word, and Excel files silently in Om
 - **Silent Printing**: Uses SumatraPDF for completely silent printing (no popup windows)
 - **Batch Processing**: Print all files in a folder with a single command
 - **Multi-format Support**: PDF, Word (.doc/.docx), Excel (.xls/.xlsx)
-- **Progress Tracking**: Shows `[1/10]`, `[2/10]` progress for each file
+- **Progress Bar & Spinner**: Visual progress bar and spinning animation so you always know what's happening
+- **Step-by-step Status**: Each file shows `[1/3] Sending... [2/3] Spooling... [3/3] Sent!`
 - **Interruption Handling**: If interrupted, shows which files were not printed
 - **Auto Cleanup**: Cleans up the done folder after successful completion
+- **One-Click Launch**: Just double-click `run.bat` — no need to type commands
 
 ## Prerequisites
 
@@ -38,7 +40,7 @@ On your **Mac Desktop**, create two folders:
 1. **`Print_Queue`** - Put files here that you want to print
 2. **`Printed_Done`** - Temporary folder for tracking (auto-cleaned after printing)
 
-### Step 2: Update the Script with Your Student ID
+### Step 2: Update the Script with Your jAccount ID
 
 Open `auto-printer.ps1` and find line 15:
 
@@ -50,8 +52,8 @@ Replace `<your jaccount ID>` with your own student ID (your Windows username in 
 
 ### Step 3: Place the Script
 
-Put `auto-printer.ps1` in a location accessible from the VM, e.g.:
-- `Z:\Documents\myProjects\Auto-printer\auto-printer.ps1`
+Put the project folder in a location accessible from the VM, e.g.:
+- `Z:\Documents\myProjects\Auto-printer\`
 
 ## Usage
 
@@ -66,6 +68,14 @@ Supported formats:
 
 ### 2. Run the Script
 
+#### Easy Way: Double-click `run.bat`
+
+Just double-click `run.bat` in the project folder. That's it!
+
+> **Tip**: Right-click `run.bat` → **Send to** → **Desktop (create shortcut)** to create a desktop shortcut for even faster access.
+
+#### Manual Way: PowerShell
+
 In your Omnissa Windows VM, open **PowerShell** and run:
 
 ```powershell
@@ -75,16 +85,10 @@ powershell -ExecutionPolicy Bypass -File "<file path>"
 Replace `<file path>` with the full path to `auto-printer.ps1`, e.g.:
 - `Z:\Documents\myProjects\Auto-printer\auto-printer.ps1`
 
-### 3. Wait for Completion
+### 3. Watch the Progress
 
-The script will:
-1. Scan all files in `Print_Queue`
-2. Print each file silently to the default printer
-3. Move printed files to `Printed_Done`
-4. Show a summary when done
-5. Clean up `Printed_Done` automatically
+The script will show a progress bar and step-by-step status for each file:
 
-Example output:
 ```
 ============================================
   Auto Printer - Z:\Desktop\Print_Queue
@@ -92,19 +96,28 @@ Example output:
 [INFO] Default printer: \\printersrv2\JI Printer
 [INFO] Found SumatraPDF: C:\Users\<your jaccount ID>\AppData\Local\SumatraPDF\SumatraPDF.exe
 ----------------------------------------
-[1/8] lecture1.pdf
-[PRINT] PDF (SumatraPDF silent): Z:\Desktop\Print_Queue\lecture1.pdf
-[DONE] Moved to: Z:\Desktop\Printed_Done\lecture1.pdf
+Overall: [#####-------------------------] 16% (1/6)
+  File: lecture1.pdf
+  [1/3] Sending to SumatraPDF...
+  [2/3] Spooling to printer... /
+  [2/3] Spooling to printer... Done!
+  [3/3] Print job sent!
+  -> Moved to done folder
 ----------------------------------------
-[2/8] homework.docx
-[PRINT] Word document: Z:\Desktop\Print_Queue\homework.docx
-[DONE] Moved to: Z:\Desktop\Printed_Done\homework.docx
+Overall: [##########-------------------] 33% (2/6)
+  File: homework.docx
+  [1/3] Opening Word...
+  [2/3] Spooling to printer... -
+  [2/3] Spooling to printer... Done!
+  [3/3] Print job sent!
+  -> Moved to done folder
 ...
 ============================================
   ALL DONE!
-  Total: 8 | Success: 8 | Failed: 0
+Result: [##############################] 100% (6/6)
+  Success: 6 | Failed: 0
 ============================================
-[CLEAN] Cleared Z:\Desktop\Printed_Done (8 file(s) removed)
+[CLEAN] Cleared Z:\Desktop\Printed_Done (6 file(s) removed)
 ```
 
 ### 4. If Interrupted
@@ -131,14 +144,25 @@ You can then re-run the script to print the remaining files.
 | Z: drive not found | Enable shared folders in Omnissa settings |
 | PDF printing shows popup | Make sure SumatraPDF is installed (Adobe shows popups) |
 | Word/Excel printing fails | Install Microsoft Office in the VM |
-| Script won't run | Use `-ExecutionPolicy Bypass` flag |
+| Script won't run | Double-click `run.bat` instead, or use `-ExecutionPolicy Bypass` flag |
+| Printing seems stuck | Check the spinner animation — if it's still spinning, the print job is being spooled to the printer |
 
 ## How It Works
 
 1. **PDF Printing Priority**: SumatraPDF (silent) → Adobe Acrobat → Windows Print verb
 2. **Word/Excel Printing**: Uses COM objects to control Office applications silently
-3. **File Tracking**: Printed files are moved to `Printed_Done` during processing, then cleaned up on success
-4. **Interruption Safety**: `try/finally` ensures unprinted files are always reported
+3. **Visual Feedback**: Progress bar shows overall completion; spinner animation shows when a print job is being spooled
+4. **File Tracking**: Printed files are moved to `Printed_Done` during processing, then cleaned up on success
+5. **Interruption Safety**: `try/finally` ensures unprinted files are always reported
+
+## Project Structure
+
+```
+Auto-printer/
+├── auto-printer.ps1   # Main PowerShell script
+├── run.bat            # One-click launcher (double-click to run)
+└── README.md          # This file
+```
 
 ## License
 
