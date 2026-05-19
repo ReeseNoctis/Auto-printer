@@ -36,20 +36,7 @@ mkdir ~/Desktop/Print_Queue
 
 The script will also auto-create this folder if it doesn't exist, so this step is optional.
 
-### Step 3: Set Up Omnissa Shared Folders
-
-In your Omnissa Windows VM, make sure shared folders are enabled:
-1. Open **Omnissa Horizon Client** settings
-2. Go to **Sharing** → enable folder sharing
-3. Your Mac Desktop should be accessible as `Z:\Desktop`, Documents as `Z:\Documents`
-
-### Step 4: Set Default Printer (in the VM)
-
-In your Windows VM, set your school printer as the **default printer**:
-1. Open **Settings** → **Bluetooth & devices** → **Printers & scanners**
-2. Select your school printer → **Set as default**
-
-### Step 5: Print!
+### Step 3: Print!
 
 In your Omnissa Windows VM, navigate to the project folder and double-click `run.bat`:
 
