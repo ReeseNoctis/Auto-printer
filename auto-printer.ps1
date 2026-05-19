@@ -9,9 +9,12 @@
 $watchFolder = "Z:\Desktop\Print_Queue"
 
 # --- SumatraPDF paths ---
-# Replace "<your jaccount ID>" with your own student ID (the Windows username in your Omnissa VM)
+# Priority: portable (local to project folder) > installed user > installed system
+# Portable version survives Omnissa VM resets since it lives on the shared drive
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $sumatraPaths = @(
-    "C:\Users\<your jaccount ID>\AppData\Local\SumatraPDF\SumatraPDF.exe",  # <-- Replace <your jaccount ID> with your student ID
+    "$scriptDir\SumatraPDF\SumatraPDF.exe",                               # Portable version in project folder (RECOMMENDED)
+    "$env:LOCALAPPDATA\SumatraPDF\SumatraPDF.exe",                        # User install (auto-detected)
     "C:\Program Files\SumatraPDF\SumatraPDF.exe",
     "C:\Program Files (x86)\SumatraPDF\SumatraPDF.exe"
 )

@@ -15,15 +15,28 @@ A PowerShell script for batch printing PDF, Word, and Excel files silently in Om
 
 ## Prerequisites
 
-### 1. Install SumatraPDF (Required for Silent Printing)
+### 1. Download SumatraPDF Portable (Required for Silent Printing)
 
-SumatraPDF is a lightweight PDF viewer (~5MB) that supports command-line silent printing.
+SumatraPDF is a lightweight PDF viewer that supports command-line silent printing. The **portable version** does not require installation — just extract it to the project folder, and it will survive Omnissa VM resets.
 
 **Download**: [https://www.sumatrapdfreader.org/download-free-pdf-viewer](https://www.sumatrapdfreader.org/download-free-pdf-viewer)
 
-Install it in your Omnissa Windows VM. The script will automatically detect it.
+Download the **portable ZIP version** (e.g. `SumatraPDF-3.x.x-64.zip`), then:
 
-> **Why SumatraPDF?** Adobe Acrobat will show popup windows during printing, which can be annoying. SumatraPDF's `-print-to-default` flag enables completely silent printing.
+1. Unzip it
+2. Move the `SumatraPDF.exe` into the `Auto-printer\SumatraPDF\` folder
+3. Create the `SumatraPDF` folder if it doesn't exist
+
+The final structure should look like:
+```
+Auto-printer/
+└── SumatraPDF/
+    └── SumatraPDF.exe
+```
+
+The script will automatically detect and use this portable version first.
+
+> **Why SumatraPDF?** Adobe Acrobat will show popup windows during printing, which can be annoying. SumatraPDF's `-print-to-default` flag enables completely silent printing. Using the portable version means you never need to reinstall it after a VM reset.
 
 ### 2. Enable Omnissa Shared Folders
 
@@ -41,17 +54,7 @@ On your **Mac Desktop**, create one folder:
 
 The script will automatically create this folder if it doesn't exist.
 
-### Step 2: Update the Script with Your jAccount ID
-
-Open `auto-printer.ps1` and find line 15:
-
-```powershell
-"C:\Users\<your jaccount ID>\AppData\Local\SumatraPDF\SumatraPDF.exe",  # <-- Replace <your jaccount ID> with your student ID
-```
-
-Replace `<your jaccount ID>` with your own student ID (your Windows username in the Omnissa VM).
-
-### Step 3: Place the Script
+### Step 2: Place the Script
 
 Put the project folder in a location accessible from the VM, e.g.:
 - `Z:\Documents\myProjects\Auto-printer\`
@@ -95,7 +98,7 @@ The script will show a progress bar and step-by-step status for each file:
   Auto Printer - Z:\Desktop\Print_Queue
 ============================================
 [INFO] Default printer: \\printersrv2\JI Printer
-[INFO] Found SumatraPDF: C:\Users\<your jaccount ID>\AppData\Local\SumatraPDF\SumatraPDF.exe
+[INFO] Found SumatraPDF: Z:\Documents\myProjects\Auto-printer\SumatraPDF\SumatraPDF.exe
 ----------------------------------------
 Overall: [#####-------------------------] 16% (1/6)
   File: lecture1.pdf
@@ -140,16 +143,16 @@ You can then re-run the script to print the remaining files.
 | Problem | Solution |
 |---------|----------|
 | "No default printer found" | Set your school printer as default in Windows Settings |
-| "No PDF reader found" | Install SumatraPDF in the VM |
+| "No PDF reader found" | Download SumatraPDF portable ZIP and extract to `Auto-printer\SumatraPDF\` |
 | Z: drive not found | Enable shared folders in Omnissa settings |
-| PDF printing shows popup | Make sure SumatraPDF is installed (Adobe shows popups) |
+| PDF printing shows popup | Make sure portable SumatraPDF is present in `Auto-printer\SumatraPDF\` (Adobe shows popups) |
 | Word/Excel printing fails | Install Microsoft Office in the VM |
 | Script won't run | Double-click `run.bat` instead, or use `-ExecutionPolicy Bypass` flag |
 | Printing seems stuck | Check the spinner animation — if it's still spinning, the print job is being spooled to the printer |
 
 ## How It Works
 
-1. **PDF Printing Priority**: SumatraPDF (silent) → Adobe Acrobat → Windows Print verb
+1. **PDF Printing Priority**: Local portable SumatraPDF → Installed SumatraPDF → Adobe Acrobat → Windows Print verb
 2. **Word/Excel Printing**: Uses COM objects to control Office applications silently
 3. **Visual Feedback**: Progress bar shows overall completion; spinner animation shows when a print job is being spooled
 4. **File Management**: Successfully printed files are deleted from the queue; failed files remain for retry
@@ -159,9 +162,11 @@ You can then re-run the script to print the remaining files.
 
 ```
 Auto-printer/
-├── auto-printer.ps1   # Main PowerShell script
-├── run.bat            # One-click launcher (double-click to run)
-└── README.md          # This file
+├── auto-printer.ps1     # Main PowerShell script
+├── run.bat              # One-click launcher (double-click to run)
+├── README.md            # This file
+└── SumatraPDF/          # Portable SumatraPDF (survives VM resets)
+    └── SumatraPDF.exe
 ```
 
 ## License
