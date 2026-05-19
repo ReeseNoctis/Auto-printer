@@ -13,6 +13,56 @@ A PowerShell script for batch printing PDF, Word, and Excel files silently in Om
 - **Auto Cleanup**: Successfully printed files are automatically deleted from the queue
 - **One-Click Launch**: Just double-click `run.bat` — no need to type commands
 
+## Quick Start
+
+> Copy-paste the commands below in your Mac's **Terminal** to get everything set up in one go.
+
+### Step 1: Clone the Project
+
+Clone this repo to a location that your Omnissa VM can access (e.g. Documents folder, which is usually mapped to `Z:\Documents` in the VM):
+
+```bash
+cd ~/Documents
+git clone https://github.com/ReeseNoctis/Auto-printer.git
+```
+
+### Step 2: Create the Print Queue Folder
+
+Create the `Print_Queue` folder on your Desktop — this is where you'll drop files to print:
+
+```bash
+mkdir ~/Desktop/Print_Queue
+```
+
+The script will also auto-create this folder if it doesn't exist, so this step is optional.
+
+### Step 3: Set Up Omnissa Shared Folders
+
+In your Omnissa Windows VM, make sure shared folders are enabled:
+1. Open **Omnissa Horizon Client** settings
+2. Go to **Sharing** → enable folder sharing
+3. Your Mac Desktop should be accessible as `Z:\Desktop`, Documents as `Z:\Documents`
+
+### Step 4: Set Default Printer (in the VM)
+
+In your Windows VM, set your school printer as the **default printer**:
+1. Open **Settings** → **Bluetooth & devices** → **Printers & scanners**
+2. Select your school printer → **Set as default**
+
+### Step 5: Print!
+
+In your Omnissa Windows VM, navigate to the project folder and double-click `run.bat`:
+
+```
+Z:\Documents\Auto-printer\run.bat
+```
+
+> **Tip**: Right-click `run.bat` → **Send to** → **Desktop (create shortcut)** for one-click access every time.
+
+That's it! Drop files into `Print_Queue` on your Mac, then double-click `run.bat` in the VM. 🎉
+
+---
+
 ## Prerequisites
 
 ### 1. SumatraPDF (Already Included)
