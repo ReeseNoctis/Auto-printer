@@ -4,10 +4,9 @@
 # ============================================================
 
 # --- Configuration ---
-# The watch folder and done folder are mapped from your Mac via Omnissa shared folders (Z: drive)
+# The watch folder is mapped from your Mac via Omnissa shared folders (Z: drive)
 # Make sure Omnissa shared folders are enabled and your Mac Desktop is mapped to Z:\Desktop
 $watchFolder = "Z:\Desktop\Print_Queue"
-$doneFolder = "Z:\Desktop\Printed_Done"
 
 # --- SumatraPDF paths ---
 # Replace "<your jaccount ID>" with your own student ID (the Windows username in your Omnissa VM)
@@ -43,15 +42,10 @@ foreach ($p in $adobePaths) {
     }
 }
 
-# --- Create folders if they don't exist ---
+# --- Create watch folder if it doesn't exist ---
 if (-not (Test-Path $watchFolder)) {
     New-Item -ItemType Directory -Path $watchFolder -Force | Out-Null
     Write-Host "[INFO] Created watch folder: $watchFolder"
-}
-
-if (-not (Test-Path $doneFolder)) {
-    New-Item -ItemType Directory -Path $doneFolder -Force | Out-Null
-    Write-Host "[INFO] Created done folder: $doneFolder"
 }
 
 # --- Detect default printer ---
@@ -255,9 +249,7 @@ $successCount = 0
 $failCount = 0
 $current = 0
 
-$printedFiles = @{}
-
-# Print each file, move to done folder on success
+# Print each file, delete on success
 try {
     foreach ($file in $files) {
         $current++
@@ -273,20 +265,8 @@ try {
 
             if ($success) {
                 $successCount++
-                $printedFiles[$fileName] = $true
-                $destPath = Join-Path $doneFolder $fileName
-
-                # Handle duplicate filenames in done folder
-                $counter = 1
-                while (Test-Path $destPath) {
-                    $baseName = [System.IO.Path]::GetFileNameWithoutExtension($fileName)
-                    $ext = [System.IO.Path]::GetExtension($fileName)
-                    $destPath = Join-Path $doneFolder "${baseName}_$counter$ext"
-                    $counter++
-                }
-
-                Move-Item -Path $filePath -Destination $destPath -Force
-                Write-Host "  -> Moved to done folder"
+                Remove-Item -Path $filePath -Force
+                Write-Host "  -> Deleted (already printed)"
             }
             else {
                 $failCount++
@@ -304,15 +284,6 @@ try {
     Show-ProgressBar -Current $successCount -Total $totalCount -Label "Result:"
     Write-Host "  Success: $successCount | Failed: $failCount"
     Write-Host "============================================"
-
-    # Clean up the done folder after successful completion
-    if ($successCount -gt 0 -and (Test-Path $doneFolder)) {
-        $doneFiles = Get-ChildItem -Path $doneFolder -File
-        if ($doneFiles.Count -gt 0) {
-            Remove-Item -Path "$doneFolder\*" -Force -Recurse
-            Write-Host "[CLEAN] Cleared $doneFolder ($($doneFiles.Count) file(s) removed)"
-        }
-    }
 }
 # If interrupted (Ctrl+C or crash), show which files were not printed
 finally {
