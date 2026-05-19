@@ -10,7 +10,7 @@ A PowerShell script for batch printing PDF, Word, and Excel files silently in Om
 - **Progress Bar & Spinner**: Visual progress bar and spinning animation so you always know what's happening
 - **Step-by-step Status**: Each file shows `[1/3] Sending... [2/3] Spooling... [3/3] Sent!`
 - **Interruption Handling**: If interrupted, shows which files were not printed
-- **Auto Cleanup**: Cleans up the done folder after successful completion
+- **Auto Cleanup**: Successfully printed files are automatically deleted from the queue
 - **One-Click Launch**: Just double-click `run.bat` — no need to type commands
 
 ## Prerequisites
@@ -33,12 +33,13 @@ Make sure your Mac folders are mapped to the Windows VM:
 
 ## Setup
 
-### Step 1: Create Folders on Your Mac
+### Step 1: Create Folder on Your Mac
 
-On your **Mac Desktop**, create two folders:
+On your **Mac Desktop**, create one folder:
 
-1. **`Print_Queue`** - Put files here that you want to print
-2. **`Printed_Done`** - Temporary folder for tracking (auto-cleaned after printing)
+- **`Print_Queue`** - Put files here that you want to print
+
+The script will automatically create this folder if it doesn't exist.
 
 ### Step 2: Update the Script with Your jAccount ID
 
@@ -102,7 +103,7 @@ Overall: [#####-------------------------] 16% (1/6)
   [2/3] Spooling to printer... /
   [2/3] Spooling to printer... Done!
   [3/3] Print job sent!
-  -> Moved to done folder
+  -> Deleted (already printed)
 ----------------------------------------
 Overall: [##########-------------------] 33% (2/6)
   File: homework.docx
@@ -110,14 +111,13 @@ Overall: [##########-------------------] 33% (2/6)
   [2/3] Spooling to printer... -
   [2/3] Spooling to printer... Done!
   [3/3] Print job sent!
-  -> Moved to done folder
+  -> Deleted (already printed)
 ...
 ============================================
   ALL DONE!
 Result: [##############################] 100% (6/6)
   Success: 6 | Failed: 0
 ============================================
-[CLEAN] Cleared Z:\Desktop\Printed_Done (6 file(s) removed)
 ```
 
 ### 4. If Interrupted
@@ -152,7 +152,7 @@ You can then re-run the script to print the remaining files.
 1. **PDF Printing Priority**: SumatraPDF (silent) → Adobe Acrobat → Windows Print verb
 2. **Word/Excel Printing**: Uses COM objects to control Office applications silently
 3. **Visual Feedback**: Progress bar shows overall completion; spinner animation shows when a print job is being spooled
-4. **File Tracking**: Printed files are moved to `Printed_Done` during processing, then cleaned up on success
+4. **File Management**: Successfully printed files are deleted from the queue; failed files remain for retry
 5. **Interruption Safety**: `try/finally` ensures unprinted files are always reported
 
 ## Project Structure
