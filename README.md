@@ -15,28 +15,13 @@ A PowerShell script for batch printing PDF, Word, and Excel files silently in Om
 
 ## Prerequisites
 
-### 1. Download SumatraPDF Portable (Required for Silent Printing)
+### 1. SumatraPDF (Already Included)
 
-SumatraPDF is a lightweight PDF viewer that supports command-line silent printing. The **portable version** does not require installation — just extract it to the project folder, and it will survive Omnissa VM resets.
+SumatraPDF is a lightweight PDF viewer that supports command-line silent printing. The **portable version is already bundled** in the `SumatraPDF/` folder of this project — no download or installation needed.
 
-**Download**: [https://www.sumatrapdfreader.org/download-free-pdf-viewer](https://www.sumatrapdfreader.org/download-free-pdf-viewer)
+Because it lives inside the project folder on your shared drive, it survives Omnissa VM resets and you never need to reinstall.
 
-Download the **portable ZIP version** (e.g. `SumatraPDF-3.x.x-64.zip`), then:
-
-1. Unzip it
-2. Move the `SumatraPDF.exe` into the `Auto-printer\SumatraPDF\` folder
-3. Create the `SumatraPDF` folder if it doesn't exist
-
-The final structure should look like:
-```
-Auto-printer/
-└── SumatraPDF/
-    └── SumatraPDF.exe
-```
-
-The script will automatically detect and use this portable version first.
-
-> **Why SumatraPDF?** Adobe Acrobat will show popup windows during printing, which can be annoying. SumatraPDF's `-print-to-default` flag enables completely silent printing. Using the portable version means you never need to reinstall it after a VM reset.
+> **Why SumatraPDF?** Adobe Acrobat will show popup windows during printing, which can be annoying. SumatraPDF's `-print-to-default` flag enables completely silent printing.
 
 ### 2. Enable Omnissa Shared Folders
 
@@ -143,7 +128,7 @@ You can then re-run the script to print the remaining files.
 | Problem | Solution |
 |---------|----------|
 | "No default printer found" | Set your school printer as default in Windows Settings |
-| "No PDF reader found" | Download SumatraPDF portable ZIP and extract to `Auto-printer\SumatraPDF\` |
+| "No PDF reader found" | Make sure `SumatraPDF/SumatraPDF.exe` exists in the project folder |
 | Z: drive not found | Enable shared folders in Omnissa settings |
 | PDF printing shows popup | Make sure portable SumatraPDF is present in `Auto-printer\SumatraPDF\` (Adobe shows popups) |
 | Word/Excel printing fails | Install Microsoft Office in the VM |
