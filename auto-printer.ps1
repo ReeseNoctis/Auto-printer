@@ -31,22 +31,41 @@ foreach ($p in $sumatraPaths) {
 # Loading a 20MB EXE from Z:\ over the network on every print adds 10-30s per file.
 # Copy once to local %TEMP% at startup — the VM resets on exit anyway, so we
 # don't need to clean up.
+# Uses robocopy instead of Copy-Item because Copy-Item from a network drive
+# (Z:\) to a local path can silently produce nothing in certain VM environments.
 if ($sumatraPath -and $sumatraPath.StartsWith($scriptDir)) {
-    $localSumatraDir = "$env:TEMP\SumatraPDF"
+    $localSumatraDir = Join-Path ([System.IO.Path]::GetTempPath()) "SumatraPDF"
     Write-Host "[INFO] Copying SumatraPDF to local temp for faster printing..."
-    if (Test-Path $localSumatraDir) {
-        Remove-Item -Recurse -Force $localSumatraDir -ErrorAction SilentlyContinue
-    }
-    Copy-Item -Recurse -Force "$scriptDir\SumatraPDF\*" $localSumatraDir
 
-    # Disable update checks on the local copy to avoid extra network round-trips
-    $localSettings = "$localSumatraDir\SumatraPDF-settings.txt"
-    if (Test-Path $localSettings) {
-        (Get-Content $localSettings) -replace 'CheckForUpdates = true', 'CheckForUpdates = false' | Set-Content $localSettings
-    }
+    # Create target directory (robocopy needs it to exist)
+    New-Item -ItemType Directory -Path $localSumatraDir -Force -ErrorAction SilentlyContinue | Out-Null
 
-    $sumatraPath = "$localSumatraDir\SumatraPDF.exe"
-    Write-Host "[INFO] SumatraPDF ready (local temp): $sumatraPath"
+    # Clean any previous stale copy
+    Get-ChildItem -Path $localSumatraDir -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+
+    # robocopy is far more reliable than Copy-Item for network → local copies in VMs.
+    # Exit codes 0-7 all indicate success (8+ = failure).
+    $sourceDir = "$scriptDir\SumatraPDF"
+    cmd /c "robocopy `"$sourceDir`" `"$localSumatraDir`" /E /NFL /NDL /NP /NJH /NJS 2>&1" | Out-Null
+
+    if ($LASTEXITCODE -le 7) {
+        # Disable update checks on the local copy to avoid extra network round-trips
+        $localSettings = Join-Path $localSumatraDir "SumatraPDF-settings.txt"
+        if (Test-Path $localSettings) {
+            (Get-Content $localSettings) -replace 'CheckForUpdates = true', 'CheckForUpdates = false' | Set-Content $localSettings
+        }
+
+        $localExe = Join-Path $localSumatraDir "SumatraPDF.exe"
+        if (Test-Path $localExe) {
+            $sumatraPath = $localExe
+            Write-Host "[INFO] SumatraPDF ready (local temp): $sumatraPath"
+        } else {
+            Write-Host "[WARN] robocopy succeeded but EXE not found, using network path"
+        }
+    }
+    else {
+        Write-Host "[WARN] robocopy failed (exit code $LASTEXITCODE), using network path"
+    }
 }
 
 # --- Adobe Acrobat paths (fallback if SumatraPDF is not installed) ---
@@ -116,7 +135,10 @@ function Show-ProgressBar {
 }
 
 # --- Spinner function ---
-# Shows a spinning animation while waiting for a process to complete
+# Shows a spinning animation while waiting for a process to complete.
+# Uses [Console]::Write() instead of Write-Host to avoid PowerShell's output
+# buffering, which otherwise causes progress to appear in stuttering chunks
+# instead of a smooth real-time animation.
 function Wait-WithSpinner {
     param(
         [System.Diagnostics.Process]$Process,
@@ -130,13 +152,15 @@ function Wait-WithSpinner {
 
     while (!$Process.HasExited -and $elapsed -lt $TimeoutSeconds) {
         $frame = $spinner[$i % 4]
-        Write-Host -NoNewline "`r  $Message... $frame   "
-        Start-Sleep -Milliseconds 500
-        $elapsed += 0.5
+        [Console]::Write("`r  $Message... $frame   ")
+        [Console]::Out.Flush()
+        Start-Sleep -Milliseconds 200
+        $elapsed += 0.2
         $i++
     }
 
-    Write-Host -NoNewline "`r  $Message... Done!    `n"
+    [Console]::Write("`r  $Message... Done!    `n")
+    [Console]::Out.Flush()
 }
 
 # --- Print function ---
@@ -151,36 +175,36 @@ function Print-File {
     if ($ext -eq ".pdf") {
         # PDF: SumatraPDF (completely silent) > Adobe (/t flag) > Windows Print verb
         if ($sumatraPath) {
-            Write-Host "  [1/3] Sending to SumatraPDF..."
+            Write-Host "  [1/2] Sending to SumatraPDF..."
             $proc = Start-Process -FilePath $sumatraPath -ArgumentList "-print-to-default `"$FilePath`"" -PassThru -WindowStyle Hidden
-            Write-Host "  [2/3] Spooling to printer..."
-            Wait-WithSpinner -Process $proc -Message "  [2/3] Spooling to printer" -TimeoutSeconds 120
+            Write-Host "  [2/2] Spooling to printer..."
+            Wait-WithSpinner -Process $proc -Message "  [2/2] Spooling to printer" -TimeoutSeconds 120
             if ($proc -and !$proc.HasExited) {
                 Write-Host "  [WARN] SumatraPDF did not exit in time, force-closing..."
                 Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
             }
-            Write-Host "  [3/3] Print job sent!"
+            Write-Host "  Done!"
         }
         elseif ($adobePath) {
-            Write-Host "  [1/3] Sending to Adobe Acrobat..."
+            Write-Host "  [1/2] Sending to Adobe Acrobat..."
             $proc = Start-Process -FilePath $adobePath -ArgumentList "/t `"$FilePath`" `"$defaultPrinter`"" -PassThru -WindowStyle Hidden
-            Write-Host "  [2/3] Spooling to printer..."
-            Wait-WithSpinner -Process $proc -Message "  [2/3] Spooling to printer" -TimeoutSeconds 120
+            Write-Host "  [2/2] Spooling to printer..."
+            Wait-WithSpinner -Process $proc -Message "  [2/2] Spooling to printer" -TimeoutSeconds 120
             if ($proc -and !$proc.HasExited) {
                 Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
             }
-            Write-Host "  [3/3] Print job sent!"
+            Write-Host "  Done!"
         }
         else {
-            Write-Host "  [1/3] Sending via Windows Print verb..."
+            Write-Host "  [1/2] Sending via Windows Print verb..."
             try {
                 $proc = Start-Process -FilePath $FilePath -Verb Print -PassThru -ErrorAction Stop
-                Write-Host "  [2/3] Spooling to printer..."
-                Wait-WithSpinner -Process $proc -Message "  [2/3] Spooling to printer" -TimeoutSeconds 60
+                Write-Host "  [2/2] Spooling to printer..."
+                Wait-WithSpinner -Process $proc -Message "  [2/2] Spooling to printer" -TimeoutSeconds 60
                 if ($proc -and !$proc.HasExited) {
                     Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
                 }
-                Write-Host "  [3/3] Print job sent!"
+                Write-Host "  Done!"
             }
             catch {
                 Write-Host "  [ERROR] No PDF reader available. Please install SumatraPDF or Adobe Acrobat Reader."
@@ -190,25 +214,26 @@ function Print-File {
     }
     # Word documents: use Word COM object for silent printing (requires Microsoft Office)
     elseif ($ext -in @(".doc", ".docx")) {
-        Write-Host "  [1/3] Opening Word..."
+        Write-Host "  [1/2] Opening Word..."
         $word = $null
         try {
             $word = New-Object -ComObject Word.Application
             $word.Visible = $false
-            Write-Host "  [2/3] Spooling to printer..."
+            Write-Host "  [2/2] Sending to printer..."
             $doc = $word.Documents.Open($FilePath)
             $doc.PrintOut()
+            # PrintOut() is synchronous, but we show a brief spinner for feedback
             $spinner = @("|", "/", "-", "\")
-            $i = 0
-            for ($s = 0; $s -lt 10; $s++) {
-                Write-Host -NoNewline "`r  [2/3] Spooling to printer... $($spinner[$i % 4])   "
-                Start-Sleep -Milliseconds 500
-                $i++
+            for ($s = 0; $s -lt 15; $s++) {
+                [Console]::Write("`r  [2/2] Sending to printer... $($spinner[$s % 4])   ")
+                [Console]::Out.Flush()
+                Start-Sleep -Milliseconds 200
             }
-            Write-Host -NoNewline "`r  [2/3] Spooling to printer... Done!    `n"
+            [Console]::Write("`r  [2/2] Sending to printer... Done!    `n")
+            [Console]::Out.Flush()
             $doc.Close($false)
             $word.Quit()
-            Write-Host "  [3/3] Print job sent!"
+            Write-Host "  Done!"
         }
         catch {
             Write-Host "  [ERROR] Failed to print Word file: $_"
@@ -220,27 +245,28 @@ function Print-File {
     }
     # Excel documents: use Excel COM object for silent printing (requires Microsoft Office)
     elseif ($ext -in @(".xls", ".xlsx")) {
-        Write-Host "  [1/3] Opening Excel..."
+        Write-Host "  [1/2] Opening Excel..."
         $excel = $null
         try {
             $excel = New-Object -ComObject Excel.Application
             $excel.Visible = $false
             $excel.DisplayAlerts = $false
-            Write-Host "  [2/3] Spooling to printer..."
+            Write-Host "  [2/2] Sending to printer..."
             $wb = $excel.Workbooks.Open($FilePath)
             $ws = $wb.Worksheets.Item(1)
             $ws.PrintOut()
+            # PrintOut() is synchronous, but we show a brief spinner for feedback
             $spinner = @("|", "/", "-", "\")
-            $i = 0
-            for ($s = 0; $s -lt 10; $s++) {
-                Write-Host -NoNewline "`r  [2/3] Spooling to printer... $($spinner[$i % 4])   "
-                Start-Sleep -Milliseconds 500
-                $i++
+            for ($s = 0; $s -lt 15; $s++) {
+                [Console]::Write("`r  [2/2] Sending to printer... $($spinner[$s % 4])   ")
+                [Console]::Out.Flush()
+                Start-Sleep -Milliseconds 200
             }
-            Write-Host -NoNewline "`r  [2/3] Spooling to printer... Done!    `n"
+            [Console]::Write("`r  [2/2] Sending to printer... Done!    `n")
+            [Console]::Out.Flush()
             $wb.Close($false)
             $excel.Quit()
-            Write-Host "  [3/3] Print job sent!"
+            Write-Host "  Done!"
         }
         catch {
             Write-Host "  [ERROR] Failed to print Excel file: $_"
@@ -278,27 +304,74 @@ $successCount = 0
 $failCount = 0
 $current = 0
 
-# Print each file, delete on success
+# --- Phase 1: Bulk pre-copy all files from Z:\ to local temp ---
+# Network reads are slow but sequential. Do them all upfront so the print
+# phase runs entirely from local disk — no more per-file "copying..." steps.
+$localQueueDir = Join-Path ([System.IO.Path]::GetTempPath()) "Print_Queue_Local"
+Write-Host "[INFO] Phase 1/2: Copying $totalCount file(s) to local temp..."
+New-Item -ItemType Directory -Path $localQueueDir -Force -ErrorAction SilentlyContinue | Out-Null
+Get-ChildItem -Path $localQueueDir -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+
+$localFileMap = @{}  # maps original Z:\path → local C:\...\path
+foreach ($file in $files) {
+    $localPath = Join-Path $localQueueDir $file.Name
+    [Console]::Write("  Copying: $($file.Name)... ")
+    [Console]::Out.Flush()
+    try {
+        [System.IO.File]::Copy($file.FullName, $localPath, $true)
+        $localFileMap[$file.FullName] = $localPath
+        [Console]::WriteLine("ok")
+    } catch {
+        [Console]::WriteLine("FAILED — will copy individually later")
+    }
+    [Console]::Out.Flush()
+}
+
+# --- Phase 2: Print from local temp ---
+Write-Host ""
+Write-Host "[INFO] Phase 2/2: Printing from local temp..."
+Write-Host ""
+
 try {
     foreach ($file in $files) {
         $current++
         $filePath = $file.FullName
         $fileName = $file.Name
 
+        # Use pre-copied local file, or copy individually as fallback
+        if ($localFileMap.ContainsKey($filePath)) {
+            $printPath = $localFileMap[$filePath]
+        } else {
+            $localPath = Join-Path $localQueueDir $fileName
+            Write-Host "  Copying to local temp (fallback)..."
+            try {
+                [System.IO.File]::Copy($filePath, $localPath, $true)
+                $printPath = $localPath
+            } catch {
+                Write-Host "  [WARN] Copy failed, printing from network: $_"
+                $printPath = $filePath
+            }
+        }
+
         Write-Host "----------------------------------------"
         Show-ProgressBar -Current $current -Total $totalCount -Label "Overall:"
         Write-Host "  File: $fileName"
 
         try {
-            $success = Print-File -FilePath $filePath
+            $success = Print-File -FilePath $printPath
 
             if ($success) {
                 $successCount++
                 Remove-Item -Path $filePath -Force
-                Write-Host "  -> Deleted (already printed)"
+                Write-Host "  -> Deleted from Print_Queue"
             }
             else {
                 $failCount++
+            }
+
+            # Clean up local temp copy regardless of success/failure
+            if ($printPath -ne $filePath) {
+                Remove-Item -Path $printPath -Force -ErrorAction SilentlyContinue
             }
         }
         catch {
@@ -329,5 +402,13 @@ finally {
             Write-Host "  - $($f.Name)"
         }
         Write-Host "============================================"
+    }
+
+    # Clean up local temp directories
+    if ($localQueueDir -and (Test-Path $localQueueDir)) {
+        Remove-Item -Recurse -Force $localQueueDir -ErrorAction SilentlyContinue
+    }
+    if ($localSumatraDir -and (Test-Path $localSumatraDir)) {
+        Remove-Item -Recurse -Force $localSumatraDir -ErrorAction SilentlyContinue
     }
 }
