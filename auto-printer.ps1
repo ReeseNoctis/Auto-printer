@@ -27,6 +27,28 @@ foreach ($p in $sumatraPaths) {
     }
 }
 
+# --- Performance: copy portable SumatraPDF from network share to local temp ---
+# Loading a 20MB EXE from Z:\ over the network on every print adds 10-30s per file.
+# Copy once to local %TEMP% at startup — the VM resets on exit anyway, so we
+# don't need to clean up.
+if ($sumatraPath -and $sumatraPath.StartsWith($scriptDir)) {
+    $localSumatraDir = "$env:TEMP\SumatraPDF"
+    Write-Host "[INFO] Copying SumatraPDF to local temp for faster printing..."
+    if (Test-Path $localSumatraDir) {
+        Remove-Item -Recurse -Force $localSumatraDir -ErrorAction SilentlyContinue
+    }
+    Copy-Item -Recurse -Force "$scriptDir\SumatraPDF\*" $localSumatraDir
+
+    # Disable update checks on the local copy to avoid extra network round-trips
+    $localSettings = "$localSumatraDir\SumatraPDF-settings.txt"
+    if (Test-Path $localSettings) {
+        (Get-Content $localSettings) -replace 'CheckForUpdates = true', 'CheckForUpdates = false' | Set-Content $localSettings
+    }
+
+    $sumatraPath = "$localSumatraDir\SumatraPDF.exe"
+    Write-Host "[INFO] SumatraPDF ready (local temp): $sumatraPath"
+}
+
 # --- Adobe Acrobat paths (fallback if SumatraPDF is not installed) ---
 $adobePaths = @(
     "C:\Program Files\Adobe\Acrobat Reader DC\Reader\AcroRd32.exe",
@@ -133,6 +155,10 @@ function Print-File {
             $proc = Start-Process -FilePath $sumatraPath -ArgumentList "-print-to-default `"$FilePath`"" -PassThru -WindowStyle Hidden
             Write-Host "  [2/3] Spooling to printer..."
             Wait-WithSpinner -Process $proc -Message "  [2/3] Spooling to printer" -TimeoutSeconds 120
+            if ($proc -and !$proc.HasExited) {
+                Write-Host "  [WARN] SumatraPDF did not exit in time, force-closing..."
+                Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+            }
             Write-Host "  [3/3] Print job sent!"
         }
         elseif ($adobePath) {
